@@ -15,7 +15,6 @@ class Contact
 	end
 end
 
-puts ENV['INTERCOME_KEY']
 intercom = Intercom::Client.new token: ENV['INTERCOM_KEY']
 
 hb_contacts = Array.new
