@@ -1,8 +1,6 @@
 require 'tiny_tds'
 require 'dotenv/load'
 
-@client = TinyTds::Client.new username: ENV['USERNAME'], password: ENV['PASSWORD'], host: ENV['HOST'], database: ENV['DATABASE']
-
 class User
 	attr_accessor :user_id, :first_name, :last_name, :email, :owner_ind, :admin_ind, :first_login, :activated, :status
   def initialize(c)
@@ -19,7 +17,7 @@ class User
 end
 
 class AccountCompany
-  attr_accessor :signed_date, :name, :is_partner, :account_company_id, :plan, :original_hbc, :transition_date, :qs_program, :onboarding_stage, :onboarding_sessions, :international
+  attr_accessor :signed_date, :name, :is_partner, :sales_rep, :account_company_id, :plan, :original_hbc, :transition_date, :qs_program, :onboarding_stage, :onboarding_sessions, :international
   def initialize(c)
     self.signed_date = c['SignedDT']
     self.name = c['AccountCompanyName']
@@ -60,19 +58,16 @@ class BizOps
   end
 
   def get_users
-    hb_users = Array.new
-    sql = " SELECT DISTINCT UserID, FirstName, LastName, ISNULL(ContactStatus,'none') AS ContactStatus, 
-            CreatedDT, UserStatus, ISNULL(UserMonthsOnSystem,0) AS UserMonthsOnSystem,AdminInd, 
-            OwnerInd, AccountCompanyID, ISNULL(EmailAddress, '') as EmailAddress
-            FROM  v_Pendo_Users"
-    # DEBUG 
+    hb = Array.new
+    sql = "SELECT * from v_Pendo_Users AS u LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID"
     results = @client.execute(sql)
     results.each do |r|
-      hb_users.push(User.new(r))
+      hb.push({ user: User.new(r), account: AccountCompany.new(r) })
     end
 
-    hb_users.each do |u|
-        puts "#{u.user_id}: #{u.first_name} #{u.last_name} - #{u.email} | #{u.status}"
+    hb.each do |hb|
+      puts "#{hb[:account].account_company_id}: #{hb[:account].name} - #{hb[:user].first_name} #{hb[:user].last_name} | #{hb[:user].email}"
     end
+
   end
 end
