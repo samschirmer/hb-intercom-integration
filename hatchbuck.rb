@@ -47,7 +47,6 @@ class FeatureUsage
     :has_deals, :has_tags, :has_tag_rules, :contacts_triggered_tag_rules, :event_campaigns, 
     :contacts_on_event_campaigns, :reg_campaigns, :contacts_on_reg_campaigns, :email_integration
   )
-
   def initialize(f)
     self.account_company_id	= f['account_company_id']
     self.num_contacts	= f['num_contacts']
@@ -91,8 +90,9 @@ class BizOps
     end
 
     hb.each do |hb|
-      puts "#{hb[:account].account_company_id}: #{hb[:account].name} - #{hb[:user].first_name} #{hb[:user].last_name} | #{hb[:user].email}\n
-      #{hb[:features].num_contacts} contacts - enough contacts: #{hb[:features].enough_contacts} - has imported: #{hb[:features].has_imported}"
+#      puts "#{hb[:account].account_company_id}: #{hb[:account].name} - #{hb[:user].first_name} #{hb[:user].last_name} | #{hb[:user].email}\n
+#      #{hb[:features].num_contacts} contacts - enough contacts: #{hb[:features].enough_contacts} - has imported: #{hb[:features].has_imported}"
+      puts hb
     end
   end
 end
