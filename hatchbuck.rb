@@ -1,6 +1,8 @@
 require 'tiny_tds'
 require 'dotenv/load'
 
+# using exotically named views and tables with all manners of column naming
+# correcting for activerecord would be about as much work as just defining the classes here
 class User
 	attr_accessor :user_id, :first_name, :last_name, :email, :owner_ind, :admin_ind, :first_login, :activated, :status
   def initialize(c)
@@ -79,20 +81,28 @@ class BizOps
     @client = TinyTds::Client.new username: ENV['USERNAME'], password: ENV['PASSWORD'], host: ENV['HOST'], database: ENV['DATABASE'], timeout: 30
   end
 
-  def get_users
-    hb = Array.new
+  def pull_active_data
     sql = " SELECT * from v_Pendo_Users AS u 
             LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
-            LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid"
+            LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
+            WHERE u.userstatus = 'Active'"
     results = @client.execute(sql)
-    results.each do |r|
+
+    hb = Array.new
+    results.each(as: :hash) do |r|
       hb.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
     end
+    return hb
+  end
 
-    hb.each do |hb|
-#      puts "#{hb[:account].account_company_id}: #{hb[:account].name} - #{hb[:user].first_name} #{hb[:user].last_name} | #{hb[:user].email}\n
-#      #{hb[:features].num_contacts} contacts - enough contacts: #{hb[:features].enough_contacts} - has imported: #{hb[:features].has_imported}"
-      puts hb
+  def pull_inactive_users
+    sql = " SELECT * from v_Pendo_Users WHERE userstatus != 'Active'"
+    results = @client.execute(sql)
+
+    inactives = Array.new
+    results.each(as: :hash) do |r|
+      inactives.push(r)
     end
+    return inactives
   end
 end

@@ -15,10 +15,20 @@ intercom_users.each do |u|
 end
 
 bo = BizOps.new
-bo.get_users
+# hb_records = [{ :user, :account, :features }, { ... }]
+hb_records = bo.pull_active_data
+		
+intercom_payloads = Array.new
+hb_records.each do |hb|
+	intercom_payloads.push(IntercomPayload.new(hb))
+#  puts hb
+end
 
-# user.custom_attributes["average_monthly_spend"] = 1234.56
+# push active data to intercom
+# example: user.custom_attributes["average_monthly_spend"] = 1234.56
 
+# get inactive data from bizops (u.userstatus != 'Active')
+hb_records = bo.pull_inactive_users
+# delete user from intercom
 
-
-
+# ensure we dont have orphaned companies with zero active users
