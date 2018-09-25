@@ -4,7 +4,7 @@ require 'dotenv/load'
 # using exotically named views and tables with all manners of column naming
 # correcting for activerecord would be about as much work as just defining the classes here
 class User
-	attr_accessor :user_id, :first_name, :last_name, :email, :owner_ind, :admin_ind, :first_login, :activated, :status
+	attr_accessor :user_id, :first_name, :last_name, :email, :owner_ind, :admin_ind, :created_date, :activated, :status
   def initialize(c)
 		self.first_name = c['FirstName']
 		self.last_name = c['LastName']
@@ -12,7 +12,7 @@ class User
     self.email = c['EmailAddress']
     self.owner_ind = c['OwnerInd']
     self.admin_ind = c['AdminInd']
-    self.first_login = c['CreatedDT']
+    self.created_date = c['CreatedDT']
     self.activated = c['UserStatus']
     self.status = c['ContactStatus']
   end
@@ -22,22 +22,27 @@ class AccountCompany
   attr_accessor(
     :signed_date, :name, :num_contacts, :is_partner, :sales_rep, 
     :account_company_id, :plan, :original_hbc, :transition_date, 
-    :qs_program, :onboarding_stage, :onboarding_sessions, :international
+    :qs_program, :onboarding_stage, :onboarding_sessions, :international,
+    :industry, :num_users, :mrr, :partner_status
   )
   def initialize(c)
     self.signed_date = c['SignedDT']
     self.name = c['AccountCompanyName']
     self.num_contacts = c['Contacts'] 
+    self.industry = c['Industry'] 
     self.is_partner = c['PartnerInd'] 
     self.sales_rep = c['SalesRepName']
+    self.num_users = c['Users']
     self.account_company_id = c['AccountCompanyID']
     self.plan = c['Name']
+    self.mrr = c['MRR']
     self.original_hbc = c['OriginalHBC'] # cf 80
     self.transition_date = c['TransitionDate'] # cf 30172
     self.qs_program = c['QSProgram'] # cf 26290
     self.onboarding_stage = c['OnboardingStage'] # cf 6960
     self.onboarding_sessions = c['OnboardingSessions'] # cf 9416
     self.international = c['International'] # cf 16440
+    self.partner_status = c['PartnerStatus'] # contactstatusid in (65991, 84895, 88783, 88784)
   end
 end
     
@@ -79,6 +84,15 @@ end
 class BizOps
   def initialize
     @client = TinyTds::Client.new username: ENV['USERNAME'], password: ENV['PASSWORD'], host: ENV['HOST'], database: ENV['DATABASE'], timeout: 30
+  end
+
+  def get_companies 
+    results = @client.execute("SELECT * FROM v_Pendo_AccountCompanies WHERE accountstatus = 'active'")
+    companies = Array.new
+    results.each(as: :hash) do |r|
+      companies.push(r)
+    end
+    return companies
   end
 
   def pull_active_data
