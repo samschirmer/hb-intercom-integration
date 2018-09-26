@@ -96,27 +96,46 @@ class BizOps
   end
 
   def pull_active_data
-    sql = " SELECT * from v_Pendo_Users AS u 
+    # pulling up to 498 active users (due to API rate limiting)
+    to_process = Array.new
+    actives_sql = " SELECT * FROM v_Pendo_Users AS u 
             LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
             LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
-            WHERE u.userstatus = 'Active'"
-    results = @client.execute(sql)
-
-    hb = Array.new
-    results.each(as: :hash) do |r|
-      hb.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
+            WHERE u.userid IN 
+            (SELECT TOP 1498 userid FROM tblIntercomQueue
+            WHERE lastprocesseddt <= dateadd(mi, -60, getutcdate()) AND status = 'Active' ORDER BY lastprocesseddt)" 
+    active_results = @client.execute(actives_sql)
+    active_results.each(as: :hash) do |r|
+      to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
     end
-    return hb
+
+    # pulling inactive users to get total to 450 to process (if needed)
+    unless to_process.count == 1498
+      inactives_sql = " SELECT * FROM v_Pendo_Users AS u 
+              LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
+              LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
+              WHERE u.userid IN 
+              (SELECT TOP #{1498 - to_process.count} userid FROM tblIntercomQueue
+              WHERE lastprocesseddt <= dateadd(hh, -3, getutcdate()) AND status = 'Inactive' ORDER BY lastprocesseddt)" 
+      inactive_results = @client.execute(inactives_sql)
+      inactive_results.each(as: :hash) do |r|
+        to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
+      end
+    end
+    return to_process
   end
 
-  def pull_inactive_users
-    sql = " SELECT * from v_Pendo_Users WHERE userstatus != 'Active'"
-    results = @client.execute(sql)
-
-    inactives = Array.new
-    results.each(as: :hash) do |r|
-      inactives.push(r)
+  def reconcile_queue(res)
+    # TODO
+    sql = " UPDATE tblIntercomQueue SET LastProcessedDT = GETUTCDATE(), LastResponseCode = #{res[:status]} 
+            WHERE UserID = #{res[:data]['user_id'].to_i}"
+    if res[:status] == 200
+      result = @client.execute(sql)
+      result.do
+      print '.'
+    else 
+      puts res[:data]
     end
-    return inactives
+#    puts res[:status] if res[:status] != 200
   end
 end

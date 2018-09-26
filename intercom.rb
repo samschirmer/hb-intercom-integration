@@ -16,7 +16,6 @@ class IntercomPayload
   def contact(c)
     contact_metadata = {
       name: "#{c.first_name} #{c.last_name}",
-      type: 'user',
       user_id: c.user_id,
       email: c.email,
       signed_up_at: c.created_date,
@@ -41,11 +40,11 @@ class IntercomPayload
       industry: m.industry,
       custom_attributes: {
         # metadata
-        'signed_at' => m.signed_date.to_i, # cast to unix seconds
+        'signed_at' => m.signed_date.nil? ? nil : m.signed_date.to_i, # cast to unix seconds
         'Partner Status' => m.partner_status, 
         'Sales Rep' => m.sales_rep, 
         'Original HBC' => m.original_hbc,
-        'transitioned_at' => m.transition_date.to_i,
+        'transitioned_at' => m.transition_date.nil? ? nil : m.transition_date.to_i,
         'QS Program' => m.qs_program,
         'Onboarding Stage' => m.onboarding_stage,
         'Onboarding Sessions' => m.onboarding_sessions,
@@ -73,7 +72,7 @@ class IntercomPayload
         'Tags Rules' => f.has_tag_rules,
         'Tag Rules - triggered' => f.contacts_triggered_tag_rules,
         'Webpage Tracking' => f.tracked_webpage
-  }.reject { |k,v| v.nil? }
+      }.reject { |k,v| v.nil? }
     }
   end
 
