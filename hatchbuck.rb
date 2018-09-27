@@ -96,46 +96,45 @@ class BizOps
   end
 
   def pull_active_data
-    # pulling up to 498 active users (due to API rate limiting)
     to_process = Array.new
-    actives_sql = " SELECT * FROM v_Pendo_Users AS u 
-            LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
-            LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
-            WHERE u.userid IN 
-            (SELECT TOP 1498 userid FROM tblIntercomQueue
-            WHERE lastprocesseddt <= dateadd(mi, -60, getutcdate()) AND status = 'Active' ORDER BY lastprocesseddt)" 
-    active_results = @client.execute(actives_sql)
-    active_results.each(as: :hash) do |r|
-      to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
+    user_ids = Array.new
+    active_user_ids_sql = "  SELECT TOP 498 userid FROM tblIntercomQueue 
+                              WHERE lastprocesseddt <= dateadd(hh, -1, getutcdate()) AND status = 'Active' 
+                              ORDER BY lastprocesseddt"
+    results = @client.execute(active_user_ids_sql)
+    results.each(as: :hash) do |r|
+      user_ids.push(r['userid'])
     end
 
-    # pulling inactive users to get total to 450 to process (if needed)
-    unless to_process.count == 1498
-      inactives_sql = " SELECT * FROM v_Pendo_Users AS u 
-              LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
-              LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
-              WHERE u.userid IN 
-              (SELECT TOP #{1498 - to_process.count} userid FROM tblIntercomQueue
-              WHERE lastprocesseddt <= dateadd(hh, -3, getutcdate()) AND status = 'Inactive' ORDER BY lastprocesseddt)" 
-      inactive_results = @client.execute(inactives_sql)
-      inactive_results.each(as: :hash) do |r|
-        to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
+    # debug
+#    user_ids = [14166,14167,14168,14169,14170,14186,14213,14279,14285,14292,14623,14624,14739]
+
+    if user_ids.count < 498
+      inactive_user_ids_sql = "  SELECT TOP #{ 498 - user_ids.count } userid FROM tblIntercomQueue 
+                        WHERE lastprocesseddt <= dateadd(hh, -3, getutcdate()) AND status = 'Inactive' 
+                        ORDER BY lastprocesseddt"
+      results = @client.execute(inactive_user_ids_sql)
+      results.each(as: :hash) do |r|
+        user_ids.push(r['userid'])
       end
+    end
+
+    sql = " SELECT * FROM v_Pendo_Users AS u 
+            LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
+            LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
+            WHERE u.userid IN (#{user_ids.join(',')})"
+    puts 'Running second query...'
+    results = @client.execute(sql)
+    results.each(as: :hash) do |r|
+      to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
     end
     return to_process
   end
 
   def reconcile_queue(res)
-    # TODO
     sql = " UPDATE tblIntercomQueue SET LastProcessedDT = GETUTCDATE(), LastResponseCode = #{res[:status]} 
             WHERE UserID = #{res[:data]['user_id'].to_i}"
-    if res[:status] == 200
-      result = @client.execute(sql)
-      result.do
-      print '.'
-    else 
-      puts res[:data]
-    end
-#    puts res[:status] if res[:status] != 200
+    result = @client.execute(sql)
+    result.do
   end
 end
