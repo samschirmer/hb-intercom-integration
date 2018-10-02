@@ -98,7 +98,7 @@ class BizOps
   def pull_active_data
     to_process = Array.new
     user_ids = Array.new
-    active_user_ids_sql = "  SELECT TOP 498 userid FROM tblIntercomQueue 
+    active_user_ids_sql = "  SELECT top 2500 userid FROM tblIntercomQueue 
                               WHERE lastprocesseddt <= dateadd(hh, -1, getutcdate()) AND status = 'Active' 
                               ORDER BY lastprocesseddt"
     results = @client.execute(active_user_ids_sql)
@@ -107,10 +107,9 @@ class BizOps
     end
 
     # debug
-#    user_ids = [14166,14167,14168,14169,14170,14186,14213,14279,14285,14292,14623,14624,14739]
-
-    if user_ids.count < 498
-      inactive_user_ids_sql = "  SELECT TOP #{ 498 - user_ids.count } userid FROM tblIntercomQueue 
+    puts "actives: #{user_ids.count}"
+    if user_ids.count < 2500
+      inactive_user_ids_sql = "  SELECT TOP #{ 2500 - user_ids.count } userid FROM tblIntercomQueue 
                         WHERE lastprocesseddt <= dateadd(hh, -3, getutcdate()) AND status = 'Inactive' 
                         ORDER BY lastprocesseddt"
       results = @client.execute(inactive_user_ids_sql)
@@ -119,11 +118,12 @@ class BizOps
       end
     end
 
+    puts "total: #{user_ids.count}"
+
     sql = " SELECT * FROM v_Pendo_Users AS u 
             LEFT JOIN v_Pendo_AccountCompanies AS ac ON ac.AccountCompanyID = u.AccountCompanyID 
             LEFT JOIN v_Intercom_2_full as f on f.account_company_id = ac.accountcompanyid
             WHERE u.userid IN (#{user_ids.join(',')})"
-    puts 'Running second query...'
     results = @client.execute(sql)
     results.each(as: :hash) do |r|
       to_process.push({ user: User.new(r), account: AccountCompany.new(r), features: FeatureUsage.new(r) })
