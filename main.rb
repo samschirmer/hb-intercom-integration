@@ -5,13 +5,17 @@ require 'typhoeus/adapters/faraday'
 require 'httparty'
 require 'json'
 require 'intercom'
-require './hatchbuck'
-require './intercom'
-require 'dotenv/load'
+require '/home/sschirmer/crons/intercom/hatchbuck'
+require '/home/sschirmer/crons/intercom/intercom'
+require 'dotenv'
+
+Dotenv.load('/home/sschirmer/crons/intercom/.env')
 
 script_start_time = Time.now
 
 bo = BizOps.new
+bo.refill_queue
+
 # hb_records = [{ :user, :account, :features }, { ... }]
 hb_records = bo.pull_active_data
 		

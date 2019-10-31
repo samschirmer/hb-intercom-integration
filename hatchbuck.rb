@@ -96,9 +96,10 @@ class BizOps
   end
 
   def pull_active_data
+		batch_size = 1500
     to_process = Array.new
     user_ids = Array.new
-    active_user_ids_sql = "  SELECT top 2500 userid FROM tblIntercomQueue 
+    active_user_ids_sql = "  SELECT top #{batch_size} userid FROM tblIntercomQueue 
                               WHERE lastprocesseddt <= dateadd(hh, -1, getutcdate()) AND status = 'Active' 
                               ORDER BY lastprocesseddt"
     results = @client.execute(active_user_ids_sql)
@@ -107,9 +108,10 @@ class BizOps
     end
 
     # debug
+=begin
     puts "actives: #{user_ids.count}"
-    if user_ids.count < 2500
-      inactive_user_ids_sql = "  SELECT TOP #{ 2500 - user_ids.count } userid FROM tblIntercomQueue 
+    if user_ids.count < batch_size
+      inactive_user_ids_sql = "  SELECT TOP #{ batch_size - user_ids.count } userid FROM tblIntercomQueue 
                         WHERE lastprocesseddt <= dateadd(hh, -3, getutcdate()) AND status = 'Inactive' 
                         ORDER BY lastprocesseddt"
       results = @client.execute(inactive_user_ids_sql)
@@ -117,6 +119,7 @@ class BizOps
         user_ids.push(r['userid'])
       end
     end
+=end
 
     puts "total: #{user_ids.count}"
 
@@ -137,4 +140,15 @@ class BizOps
     result = @client.execute(sql)
     result.do
   end
+
+	def refill_queue
+		sql = "	INSERT INTO tblIntercomQueue (UserID, AccountCompanyID, LastProcessedDT, Status, ProcessedInd)
+						SELECT u.UserID, u.AccountCompanyID, dateadd(dd, -2, getutcdate()), 'active', 0
+						FROM SystematicRevenue.dbo.tblUsers u
+						INNER JOIN SystematicRevenue.dbo.tblAccountCompanies ac ON ac.AccountCompanyID = u.AccountCompanyID 
+						INNER JOIN v_Pendo_AccountCompanies AS gac ON ac.AccountCompanyID = gac.AccountCompanyID
+						WHERE ac.AccountCompanyID NOT IN (SELECT AccountCompanyID FROM tblIntercomQueue)"
+    result = @client.execute(sql)
+    result.do
+	end
 end
